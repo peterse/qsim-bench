@@ -1,0 +1,154 @@
+
+
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{courier}
+
+% allow appendix sections after a certain delimiter
+\usepackage[title]{appendix}
+
+\usepackage[english]{babel}
+\usepackage{hyperref}	
+\usepackage{graphicx}% Include figure files
+\usepackage{dcolumn}% Align table columns on decimal point
+\usepackage{bm}% bold math
+\usepackage{hyperref}% add hypertext capabilities
+%\usepackage[mathlines]{lineno}% Enable numbering of text and display math
+%\linenumbers\relax % Commence numbering lines
+\usepackage{braket}
+\usepackage{amsmath,amssymb,latexsym}
+
+%modulo command
+\newcommand{\Mod}[1]{\ (\mathrm{mod}\ #1)}
+
+
+\usepackage{bbold}
+\usepackage[usenames, dvipsnames]{color}
+
+% integer command is \Z
+\usepackage{amsfonts}
+\newcommand{\Z}{\mathbb{Z}}
+
+
+\usepackage{comment}
+\usepackage{natbib}
+\usepackage{mathrsfs}
+\usepackage{soul}
+%textboxes
+\usepackage{mdframed}
+\newcommand{\spliteq}[1]{\begin{equation}
+\begin{split}
+#1
+\end{split}
+\end{equation}
+}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\newcommand{\dd}[2]{\frac{d#1}{d#2}}
+
+\usepackage{qcircuit}
+
+
+\title{Performance benchmarks for common circuit simulators}
+\author{Evan}
+%\date{October 2018}
+
+
+
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+	abstract here 
+\end{abstract}
+
+
+\newpage
+\tableofcontents
+\newpage
+
+
+
+\section{Methods}
+\section{Simulator methods}
+
+\subsection{General unitary matrix multiplication}
+\label{sec:fallback3}
+A complete wavefunction simulator (cite Biamonte for what that means; I'll be reffing tensor networks anyways) generally applies the action of a gate as an einsum to the qubit axes acted on by the gate.
+
+Worked example: Computing $U_2 U_1 \vec{\psi}$
+For example, let $U_1$ be a unitary over a subset of $k_1$ and $U_2$ be qubits on a state defined over $k_2$, and the target state $\ket{\psi}$ be defined over $n$ qubits. Then we have:
+
+\begin{align}
+	 \vec{\psi} &\in \mathbb{C}^{2^n} \\
+	 U_1 &\in \mathbb{C}^{2^{k_1} \times 2^{k_1}} \\
+	 U_2 &\in \mathbb{C}^{2^{k_2} \times 2^{k_2}} \\
+\end{align}
+
+
+The following list details approaches to computing $U_2 U_1 \ket{\psi}$ in order of worst to best:
+\begin{enumerate}
+	\item \textbf{kronecker product + matmul}: This requires resizing the matrices to $n$ dimensions then performing matrix multiplication
+	\begin{enumerate}
+		\item kronecker product $U_1 \rightarrow U_1' \in \mathbb{C^{2^n \times 2^n}}$ using $I_2$ ($\mathbb{O}(2^k_1 2^k_1 2^{n-k_1} 2^{n-k_1}) = \mathbb{O}(2^{2n})$)
+		\item kronecker product $U_2 \rightarrow U_2' \in \mathbb{C^{2^n \times 2^n}}$ using $I_2$ ($\mathbb{O}(2^k_2 2^k_2 2^{n-k_2} 2^{n-k_2}) = \mathbb{O}(2^{2n})$)
+		\item matmul $U_2' U_1' \rightarrow U_f \in \mathbb{C^{2^n \times 2^n}}$ ($\mathbb{O}(2^{3n})$)\footnote{Assuming ``schoolbook'' matrix multiplication algorithm. For square matrix multiplication this can be improved to $\mathbb{O}(2^{2.807n})$ or even $\mathbb{O}(2^{2.37n})$ with ML but that's not the point of this worst-case example}
+		\item matmul $ U_f \vec{\psi}$ ($\mathbb{O}(2^{2n})$)
+	\end{enumerate}
+	\item \textbf{kronecker product + matmul, associativity}: This swaps (c) and (d), taking advantage of the fact that $U \vec{\psi}$ has complexity $\mathbb{O}(2^{2n})$ for $U \in \mathbb{C}^{2^n \times 2^n}$, meaning both products cost $\mathbb{O}(2^{2n + 1})$ instead of $\mathbb{O}(2^{3n} + 2^{2n})$. Conceptually this results from not having to calculate the full intermediate $U_f$.
+	\item \textbf{einsum}: An einstein summation allows general tensor transformations using repeated (summation) and permuted (free) indices (See Appendix~\ref{sec:a1} for some common examples). The austere implementation results in a complexity of\cite{https://obilaniu6266h16.wordpress.com/2016/02/04/einstein-summation-in-numpy/}: 
+		\begin{equation}
+			\mathbb{O}\left( \left(\prod_i^{N_\text{free}} d_i\right) \left(\prod_i^{N_\text{sum}} d_i\right) \right)
+		\end{equation}
+		where $N_\text{free}$ is the number of free indices (indices of output), $N_\text{sum}$ is the number of unique input indices between input tensors, and $d_i$ is the size of the axis corresponding to the i-th index. \footnote{For example, the einsum string \textbf{ik,kj-$>$ij} multiplies two matrices using free indices \textbf{i}, \textbf{j} and summation index \textbf{k}; if \textbf{i}, \textbf{j}, \textbf{k} index axes of sizes $\ell,m,n$ respectively, the complexity of this einsum is 	$\mathbb{O}( (d_i d_j) (d_k) ) = \mathbb{O}( \ell mn)$, the expected complexity of matrix multiplication.}
+		
+		Let unitaries and wavefunctions be represented as tensors of the shape:
+		\begin{align}
+			U &\in \mathbb{C}^{\overbrace{ \scriptstyle 2 \times 2 \times \cdots}^{\text{k times}}} \\
+			\vec{\psi} &\in \mathbb{C}^{\overbrace{ \scriptstyle 2 \times \cdots}^\text{n times}}
+		\end{align}
+		Then the einsum computing $U\vec{\psi}$ is indexed as
+		$$i_1 \cdots i_k, i_1 \cdots i_n \rightarrow i_1 \cdots i_n $$
+		has $k$ summation indices and $(n-k)$ free indices, resulting in a complexity of $\mathbb{O}(2^n)$ since every tensor axis is dimension two. This is a two-fold speedup over square matrix math. Conceptually this results from ?!?!?!?!.		
+\end{enumerate}
+
+The complexity of method (3) is obviously a lower bound since \textit{computing} all of the elements in $\vec{\psi}' = U \vec{\psi}$ elements can require no less than $2^n$ computations. However this is cannot be the minimum complexity of processing (FIXME: computing vs processing vs solving..?!?!?!?!) $U \vec{\psi}$, since the simple counterexample of $I \vec{\psi}$ requires exactly 0 computations. This motivates even more streamlined unitary action, which will be introduced in the following sections.
+
+\subsection{Clifford circuits}
+
+\subsubsection{Example: $X_k$}
+\label{sec:clifford_example}
+This section begins with an example of applying a permutation to a tensor subspace (taken from the \texttt{apply\_unitary} from the \textsc{cirq} library). Let $X_k$ be the Pauli-X gate acting on the qubit indexed ``k''. Define the operation $\texttt{slice\_for\_bitstring}(T, \{i\text{ for i=1...k}\}, \vec{s})$ to access elements of tensor $T$ for which the subspace corresponding to qubits $\{0, 1, \cdots, k\}$ is represented by the (little-endian) bitstring $\vec{s}$ (and so $|\vec{s}| = |\{i_k\}|$). TODO: example of this....
+
+This slices for a subset of $2^{n-k}$ elements, but for an array stored with a known memory layout and stride the slice can be accessed in $\mathbb{O}(k)$ time (DEMONSTRATED EMPIRICALLY, PROVE THIS?). Then the action of $X_k$ on $\vec{\psi}$ can be computed in two steps using a memory buffer $T'$ sized the same as $T$:
+\begin{itemize}
+	\item Compute $S_0 = \texttt{slice\_for\_bitstring}(T, \{k\}, (0))$ and \\$S_1= \texttt{slice\_for\_bitstring}(T, \{k\}, (0))$ which slice $T$ for all elements in which the k-th qubit is a ``0'' or ``1'' respectively
+	\item Set $T'[S_1] = T[S_0]$ and $T'[S_0] = T[S_1]$. In plain English, this sets the amplitude for each basis state in $T'$ to be the same as the amplitude in $T$ where the k-th qubit of that basis state is flipped. 
+\end{itemize}
+
+\subsubsection{General Clifford operations}
+Section \ref{sec:clifford_example} demonstrated how a single-qubit gate acting on an n-qubit state can be implemented in $\mathbb{O}(n)$, which is exponential improvement over the best matrix-style operations (at the expense of exponential memory overhead in the number of qubits, i.e. the buffer state).
+
+
+TODO
+
+- Clifford circuits are easy to simulate (Gottesman). Computationally these are relatively sparse matrices.
+
+Here we review an algorithmic app
+
+\section{Benchmark methods}
+This repo uses the \textsc{pytest-benchmark} fixture to profile python code.
+
+\section{Results}
+
+
+\begin{appendices}
+\section{Appendix 1: Einsum operations}
+\label{sec:a1}
+
+Some common einsum-compatible operations: transpose, inner produc, matrix multiplication, trace.
+\end{appendices}
+\end{document}

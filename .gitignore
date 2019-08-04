@@ -1,0 +1,8 @@
+
+
+# LaTeX meta
+*.aux
+*.log
+*.out
+*.gz
+*.toc
