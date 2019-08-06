@@ -8,12 +8,16 @@ np.random.seed(31415926)
 
 
 # pairs like (number of qubits, depth)
-TRIAL_RUNS = [
-    (4, 10),
-    (5, 10),
-    (6, 10),
-]
-
+@pytest.fixture(scope="module")
+def meta():
+    """Shared circuit and parameter data across tests."""
+    depth = 50
+    qubits = cirq.LineQubit.range(10)
+    n_loops = 100000
+    return {"depth": depth,
+            "qubits": qubits,
+            "n_loops": n_loops,
+            "params": np.random.randn(n_loops, len(qubits) * depth)}
 
 
 def get_parametrized_two_qubit_gates():
@@ -61,11 +65,16 @@ def update_params(circuit, params):
     return cirq.Circuit.from_ops(new_op_tree)
 
 
-def trial(depth, qubits, params):
+def _generator_type_zero(depth, qubits, params):
     """Initialize a circuit according to a set of parameters.
 
-        `params` should be shape (n_qubits * depth, )
+        Uses only parametrized single-qubit gates.
 
+        Args:
+            `params` should be shape (n_qubits * depth, )
+
+        Returns:
+            cirq.Circuit
         returns a nested list of ops (OP_TREE)
     """
     out = []
@@ -80,7 +89,19 @@ def trial(depth, qubits, params):
         # out.append(random_single_qubit_gates_layer(qubits, param_subset))
         # else:
         #     out.append(random_two_qubit_gates_layer(qubits, param_subset))
-    return out
+    return cirq.Circuit.from_ops(out)
+
+
+@pytest.mark.parametrize('helper', [_CirqTPU, _TFCirq, _TFQEigen, _Cirq])
+def test_single_qubit_parametrized_n_loops(meta, benchmark, helper):
+    c = _generator_type_zero(meta["depth"], meta["qubits"], meta["params"])
+    for i, param_row in zip(range(meta["n_loops"]), meta["params"]):
+        pass
+
+
+
+
+
 
 
 def timeit_n_rounds_k_updates(qubits, depth, sim_trials, n_param_updates):
