@@ -57,14 +57,6 @@ def random_single_qubit_gates_layer(qubits, params):
 #     return [g(exponent=e)(qi,qj) for g,(qi,qj),e in zip(rand_twoq, qubit_pairs, params)]
 
 
-def update_params(circuit, params):
-    """Competitor method to cirq.ParamResolver."""
-    new_op_tree = []
-    for op, param in zip(circuit.all_operations(), params):
-        new_op_tree.append(op.gate._with_exponent(param/np.pi)(*op.qubits))
-    return cirq.Circuit.from_ops(new_op_tree)
-
-
 def _generator_type_zero(depth, qubits, params):
     """Initialize a circuit according to a set of parameters.
 
@@ -95,27 +87,22 @@ def _generator_type_zero(depth, qubits, params):
 @pytest.mark.parametrize('helper', [_CirqTPU, _TFCirq, _TFQEigen, _Cirq])
 def test_single_qubit_parametrized_n_loops(meta, benchmark, helper):
     c = _generator_type_zero(meta["depth"], meta["qubits"], meta["params"])
-    for i, param_row in zip(range(meta["n_loops"]), meta["params"]):
+    for k, param_row in zip(range(meta["n_loops"]), meta["params"]):
         pass
 
 
 
 
-
-
-
-def timeit_n_rounds_k_updates(qubits, depth, sim_trials, n_param_updates):
-    """
-        Args:
-            qubits: QubitId representation of circuit qubits
-            depth (int): Circuit depth.
-            sim_trials (int): Number of trials to run each simulation for the
-                purpose of averaging
-            n_param_updates (int): Number of updates to invoke per trial.
-
-        Returns:
-            Array of shape (sim_trials, ) containing times for each trial
-    """
+        """
+        TODO: this can be removed once validation run is set up.
+        VERIFICATION:
+        Results between two resolved circuits will be compared
+        according to the amplitude of the wavefunction at a random index
+        `v_ind`, for every trial, for every parameter in the param updates.
+        """
+        sympy_outcomes = np.zeros(n_param_updates).astype(np.complex64)
+        float_outcomes = np.zeros(n_param_updates).astype(np.complex64)
+        v_ind = np.random.randint(2**n_qubits - 1)
 
     """
     TIMING:
@@ -137,15 +124,9 @@ def timeit_n_rounds_k_updates(qubits, depth, sim_trials, n_param_updates):
     float_times = []
     n_qubits = len(qubits)
     for k in range(sim_trials):
-        """
-        VERIFICATION:
-        Results between two resolved circuits will be compared
-        according to the amplitude of the wavefunction at a random index
-        `v_ind`, for every trial, for every parameter in the param updates.
-        """
-        sympy_outcomes = np.zeros(n_param_updates).astype(np.complex64)
-        float_outcomes = np.zeros(n_param_updates).astype(np.complex64)
-        v_ind = np.random.randint(2**n_qubits - 1)
+
+        float_circuit = update_params(float_circuit, all_params[j][:])
+        float_outcomes[j] =  cirq.Simulator().simulate(float_circuit, initial_state=np.copy(x)).final_state[v_ind]
 
         # precompute all parameter updates to apply to both circuits
         all_params = np.random.rand(n_param_updates, n_qubits*depth)
@@ -192,6 +173,26 @@ def timeit_n_rounds_k_updates(qubits, depth, sim_trials, n_param_updates):
         print("  float: ", float_trial_time)
 
     return np.asarray(sympy_times), np.asarray(float_times)
+
+
+
+
+
+def timeit_n_rounds_k_updates(qubits, depth, sim_trials, n_param_updates):
+    """
+        Args:
+            qubits: QubitId representation of circuit qubits
+            depth (int): Circuit depth.
+            sim_trials (int): Number of trials to run each simulation for the
+                purpose of averaging
+            n_param_updates (int): Number of updates to invoke per trial.
+
+        Returns:
+            Array of shape (sim_trials, ) containing times for each trial
+    """
+
+    """
+
 
 """
 Benchmark description:
