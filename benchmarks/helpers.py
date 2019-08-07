@@ -1,4 +1,3 @@
-
 import cirq
 import numpy as np
 import sympy
@@ -8,19 +7,14 @@ from cirq.contrib.tpu import (
 )
 import tensorflow as tf
 
-# tf-cirq
-from cirq.contrib.tf_backend.tf_simulator import (
-    TFWaveFunctionSimulator
-)
+import tfc
+
 
 class Helper:
     def __init__(self, meta):
         """
         Args:
-            labels: Ordered list of strings corresponding to targets for
-                updates during call to `updated_execute`.
         """
-        self.labels = labels
 
 
 class _CirqTPU(Helper):
@@ -53,14 +47,13 @@ class _TFCirq(Helper):
     @staticmethod
     def prepare(c, **kwargs):
         """Preprocess circuit c before timing starts."""
-        simulator = TFWaveFunctionSimulator(dtype=tf.complex64)
+        simulator = tfc.TFWaveFunctionSimulator(dtype=tf.complex64)
         return simulator.simulate(c, **kwargs)
 
     @staticmethod
     def execute(cprime):
         """Compile ops from cirq into XLA-compatibile ops via cirq.contrib.tpu.
         """
-
         # todo: simpler operation than returning full wf? like:
         #expectation = lambda: tf.norm(r.compute()[:128], 2)
 
@@ -122,7 +115,7 @@ class _Cirq(Helper):
         Override cirq's Sympy resolver for circuit rewrites.
         """
         self.symbols = [sympy.Symbol("v{i}") for i in range(len(params))]
-        return [tf.placeholder(tf.complex64, shape=(), name=s) for s in self.labels]
+        return
 
     def updated_execute(self, cprime, params):
         """Perform parameter updates for all parameters in circuit cprime.
