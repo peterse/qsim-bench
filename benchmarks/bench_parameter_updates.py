@@ -86,23 +86,29 @@ def _generator_type_zero(depth, qubits, params):
 
 @pytest.mark.parametrize('helper', [_CirqTPU, _TFCirq, _TFQEigen, _Cirq])
 def test_single_qubit_parametrized_n_loops(meta, benchmark, helper):
+    inst = helper(meta)
     c = _generator_type_zero(meta["depth"], meta["qubits"], meta["params"])
-    for k, param_row in zip(range(meta["n_loops"]), meta["params"]):
-        pass
+    params = inst.prepare_parameters(meta["params"][0])
+    cprime = helper.prepare(c)
+    #  TODO: implement initial_state
+    # x = np.ones(2**n_qubits, dtype=np.complex64) / np.sqrt(2**n_qubits)
+    def loop():
+        for k, params in zip(range(meta["n_loops"]), meta["params"]):
+            inst.updated_execute(cprime, params)
+    benchmark(loop())
 
 
 
-
-        """
-        TODO: this can be removed once validation run is set up.
-        VERIFICATION:
-        Results between two resolved circuits will be compared
-        according to the amplitude of the wavefunction at a random index
-        `v_ind`, for every trial, for every parameter in the param updates.
-        """
-        sympy_outcomes = np.zeros(n_param_updates).astype(np.complex64)
-        float_outcomes = np.zeros(n_param_updates).astype(np.complex64)
-        v_ind = np.random.randint(2**n_qubits - 1)
+    """
+    TODO: this can be removed once validation run is set up.
+    VERIFICATION:
+    Results between two resolved circuits will be compared
+    according to the amplitude of the wavefunction at a random index
+    `v_ind`, for every trial, for every parameter in the param updates.
+    """
+    sympy_outcomes = np.zeros(n_param_updates).astype(np.complex64)
+    float_outcomes = np.zeros(n_param_updates).astype(np.complex64)
+    v_ind = np.random.randint(2**n_qubits - 1)
 
     """
     TIMING:
@@ -120,63 +126,6 @@ def test_single_qubit_parametrized_n_loops(meta, benchmark, helper):
       2. call to cirq.Simulator() using this new state
       3. put a random wavefunction element to outcomes[v_ind]
     """
-    sympy_times = []
-    float_times = []
-    n_qubits = len(qubits)
-    for k in range(sim_trials):
-
-        float_circuit = update_params(float_circuit, all_params[j][:])
-        float_outcomes[j] =  cirq.Simulator().simulate(float_circuit, initial_state=np.copy(x)).final_state[v_ind]
-
-        # precompute all parameter updates to apply to both circuits
-        all_params = np.random.rand(n_param_updates, n_qubits*depth)
-        all_params = np.ones((n_param_updates, n_qubits*depth))
-        # initialize a persistent sympy-parametrized circuit
-        symbol_strings = []
-        for i in range(n_qubits*depth):
-            symbol_strings.append("{}".format(i) )
-        layer_symbols = [sympy.Symbol(s) for s in symbol_strings]
-        global trial
-        layers = trial(depth, qubits, layer_symbols)
-
-        # consistent initial state prep
-        x = np.ones(2**n_qubits, dtype=np.complex64) / np.sqrt(2**n_qubits)
-        sympy_circuit = cirq.Circuit.from_ops([g for l in layers for g in l])
-        # cirq param resolver: Time includes only update
-        start = timer()
-        resolvers = [dict(zip(symbol_strings, all_params[j][:])) for j in range(n_param_updates)]
-        for j in range(n_param_updates):
-
-            sympy_outcomes[j] = cirq.Simulator().simulate(sympy_circuit,
-                                      initial_state=np.copy(x),
-                                      param_resolver=resolvers[j]).final_state[v_ind]
-
-        sympy_trial_time = timer() - start
-        sympy_times.append(sympy_trial_time)
-
-        # initialize a copy of the circuit, this time using hard-coded angles
-        # the symbols will be overwritten with the first update.
-        float_circuit = sympy_circuit.copy()
-        start = timer()
-        for j in range(n_param_updates):
-            # Regenerate _entire_ circuit with updates to float values
-            # each time includes the circuit construction time
-            float_circuit = update_params(float_circuit, all_params[j][:])
-            float_outcomes[j] =  cirq.Simulator().simulate(float_circuit, initial_state=np.copy(x)).final_state[v_ind]
-
-        float_trial_time = timer() - start
-        float_times.append(float_trial_time)
-
-        np.testing.assert_array_almost_equal(float_outcomes, sympy_outcomes)
-        print("trial {}:")
-        print("  sympy: ", sympy_trial_time)
-        print("  float: ", float_trial_time)
-
-    return np.asarray(sympy_times), np.asarray(float_times)
-
-
-
-
 
 def timeit_n_rounds_k_updates(qubits, depth, sim_trials, n_param_updates):
     """
@@ -191,7 +140,6 @@ def timeit_n_rounds_k_updates(qubits, depth, sim_trials, n_param_updates):
             Array of shape (sim_trials, ) containing times for each trial
     """
 
-    """
 
 
 """
@@ -203,25 +151,3 @@ Benchmark description:
         (a) Sympy variables with native cirq ParamResolver feed dict
         (b) Circuit reconstructed directly from new parameters
 """
-SIM_TRIALS = 20  # average runtime over this many runs
-N_PARAMS = 20
-N_PARAM_UPDATES = 100 # how many times to replace the parameters
-# DEPTH = 10  # depth of dense matrix layers
-MAX_N = 5  # run trials for n_qubits = 2...MAX_N
-# N_QUBITS = list(range(2, MAX_N))
-N_QUBITS = np.asarray([5])
-DEPTHS = np.asarray(range(1,10))
-all_sympy_runs = np.zeros((len(N_QUBITS), len(DEPTHS), SIM_TRIALS))
-all_float_runs = np.zeros((len(N_QUBITS), len(DEPTHS), SIM_TRIALS))
-
-for i, n_qubits in enumerate(N_QUBITS):
-    for j, depth in enumerate(DEPTHS):
-        qubits = cirq.LineQubit.range(n_qubits)
-        print("simulating {} qubits".format(n_qubits))
-        s1, f1 = timeit_n_rounds_k_updates(qubits, depth, SIM_TRIALS, N_PARAM_UPDATES)
-        all_sympy_runs[i][j][:] = s1
-        all_float_runs[i][j][:] = f1
-
-np.save('cirq_sympy_bench.npy', np.asarray(all_sympy_runs))
-np.save('cirq_float_bench.npy', np.asarray(all_float_runs))
-np.save('cirq_sympy_meta.npy', np.array([N_QUBITS, SIM_TRIALS, DEPTHS, N_PARAM_UPDATES]))
