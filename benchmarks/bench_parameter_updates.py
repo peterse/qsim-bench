@@ -84,8 +84,17 @@ def _generator_type_zero(depth, qubits, params):
     return cirq.Circuit.from_ops(out)
 
 
-@pytest.mark.parametrize('helper', [_CirqTPU, _TFCirq, _TFQEigen, _Cirq])
+@pytest.mark.parametrize('helper', [_TFCirq, _Cirq])
 def test_single_qubit_parametrized_n_loops(meta, benchmark, helper):
+    """
+    Benchmark description:
+
+        For number of parameters N_PARAMS, construct a circuit of mixed one- and
+        two-qubit parametrized gates of total depth DEPTH. Compare the following
+        param resolution methods:
+            (a) Sympy variables with native cirq ParamResolver feed dict
+            (b) Circuit reconstructed directly from new parameters
+    """
     inst = helper(meta)
     c = _generator_type_zero(meta["depth"], meta["qubits"], meta["params"])
     params = inst.prepare_parameters(meta["params"][0])
@@ -96,58 +105,3 @@ def test_single_qubit_parametrized_n_loops(meta, benchmark, helper):
         for k, params in zip(range(meta["n_loops"]), meta["params"]):
             inst.updated_execute(cprime, params)
     benchmark(loop())
-
-
-
-    """
-    TODO: this can be removed once validation run is set up.
-    VERIFICATION:
-    Results between two resolved circuits will be compared
-    according to the amplitude of the wavefunction at a random index
-    `v_ind`, for every trial, for every parameter in the param updates.
-    """
-    sympy_outcomes = np.zeros(n_param_updates).astype(np.complex64)
-    float_outcomes = np.zeros(n_param_updates).astype(np.complex64)
-    v_ind = np.random.randint(2**n_qubits - 1)
-
-    """
-    TIMING:
-    Sympy parameter resolution: Each trial consists of the time to run all of:
-      3. call to cirq.Simulator() with param resolver kwarg
-      4. access `final_state` field of TrialResult
-      5. put a random wavefunction element to outcomes[v_ind]
-
-    note that the parameter resolvers are constructed ahead of time, which
-    is actually generous to the timing.
-
-    circuit reconstructions: Each trial consists of the time to run all of:
-      1. Iteratively copy the existing circuit op-wise, inserting new
-           angles according to randomly generated params
-      2. call to cirq.Simulator() using this new state
-      3. put a random wavefunction element to outcomes[v_ind]
-    """
-
-def timeit_n_rounds_k_updates(qubits, depth, sim_trials, n_param_updates):
-    """
-        Args:
-            qubits: QubitId representation of circuit qubits
-            depth (int): Circuit depth.
-            sim_trials (int): Number of trials to run each simulation for the
-                purpose of averaging
-            n_param_updates (int): Number of updates to invoke per trial.
-
-        Returns:
-            Array of shape (sim_trials, ) containing times for each trial
-    """
-
-
-
-"""
-Benchmark description:
-
-    For number of parameters N_PARAMS, construct a circuit of mixed one- and
-    two-qubit parametrized gates of total depth DEPTH. Compare the following
-    param resolution methods:
-        (a) Sympy variables with native cirq ParamResolver feed dict
-        (b) Circuit reconstructed directly from new parameters
-"""

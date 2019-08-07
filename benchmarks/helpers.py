@@ -77,6 +77,10 @@ class _TFCirq(Helper):
         """Perform parameter updates for all parameters in circuit cprime.
 
         This expects a feed dict of the form {placeholder-name: new_value}
+
+        Timing disclosure:
+          1. Construct feeder from `params` arg
+          2. Run compiled TFWaveFunctionSimulator graph
         """
         new_labels = [s+":0" for s in self.labels]
         feed_dict = dict(zip(new_labels, params))
@@ -126,8 +130,15 @@ class _Cirq(Helper):
         This expects a feed dict of the form {placeholder-name: new_value}
 
         Update all parameters and run in a single, timable action. This
-        expects a feed dict of the form {symbol: new_value}. This abbreviated
-        method is UNSAFE: and will ignore symbol resolutions for a 10x speedup.
+        expects a feed dict of the form {symbol: new_value}.
+
+        WARNING:This abbreviated method is UNSAFE: and will ignore symbol
+        resolutions for a 10x speedup.
+
+        Timing disclosure:
+          1. Iteratively copy the existing circuit op-wise, inserting new
+               angles according to randomly generated params
+          2. call to cirq.Simulator() using this new state
         """
         # TODO: fix cirq's paramresolver
         # param_resolver = dict(zip(self.symbols, params))
