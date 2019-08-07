@@ -13,9 +13,9 @@ np.random.seed(31415926)
 @pytest.fixture(scope="module")
 def meta():
     """Shared circuit and parameter data across tests."""
-    depth = 50
+    depth = 5
     qubits = cirq.LineQubit.range(10)
-    n_loops = 10
+    n_loops = 1000
     return {"depth": depth,
             "qubits": qubits,
             "n_loops": n_loops,
