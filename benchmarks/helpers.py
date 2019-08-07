@@ -64,7 +64,8 @@ class _TFCirq(Helper):
     def prepare_parameters(self, params):
         """Prepare a class-specific invocation of the input parameters."""
         self.labels = [f"v{i}" for i in range(len(params))]
-        return [tf.placeholder(tf.complex64, shape=(), name=s) for s in self.labels]
+        self.placeholders = [tf.placeholder(tf.complex64, shape=(), name=s) for s in self.labels]
+        return self.placeholders
 
     def updated_execute(self, cprime, params):
         """Perform parameter updates for all parameters in circuit cprime.
@@ -75,8 +76,9 @@ class _TFCirq(Helper):
           1. Construct feeder from `params` arg
           2. Run compiled TFWaveFunctionSimulator graph
         """
-        new_labels = [s+":0" for s in self.labels]
-        feed_dict = dict(zip(new_labels, params))
+        # new_labels = [s+":0" for s in self.labels]
+
+        feed_dict = dict(zip(self.placeholders, params))
         with tf.Session() as session:
             output = session.run(cprime, feed_dict=feed_dict)
         return output

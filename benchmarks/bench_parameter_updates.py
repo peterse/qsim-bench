@@ -14,8 +14,8 @@ np.random.seed(31415926)
 def meta():
     """Shared circuit and parameter data across tests."""
     depth = 5
-    qubits = cirq.LineQubit.range(10)
-    n_loops = 1000
+    qubits = cirq.LineQubit.range(5)
+    n_loops = 100
     return {"depth": depth,
             "qubits": qubits,
             "n_loops": n_loops,
@@ -100,7 +100,6 @@ def test_single_qubit_parametrized_n_loops(benchmark, meta, helper):
     """
     inst = helper(meta)
     c = _generator_type_zero(meta["depth"], meta["qubits"], meta["params"][0])
-
     params = inst.prepare_parameters(meta["params"][0])
     cprime = helper.prepare(c)
 
