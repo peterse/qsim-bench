@@ -110,31 +110,35 @@ The following list details approaches to computing $U_2 U_1 \ket{\psi}$ in order
 			U &\in \mathbb{C}^{\overbrace{ \scriptstyle 2 \times 2 \times \cdots}^{\text{k times}}} \\
 			\vec{\psi} &\in \mathbb{C}^{\overbrace{ \scriptstyle 2 \times \cdots}^\text{n times}}
 		\end{align}
-		Then the einsum computing $U\vec{\psi}$ is indexed as
-		$$i_1 \cdots i_k, i_1 \cdots i_n \rightarrow i_1 \cdots i_n $$
-		has $k$ summation indices and $(n-k)$ free indices, resulting in a complexity of $\mathbb{O}(2^n)$ since every tensor axis is dimension two. This is a two-fold speedup over square matrix math. Conceptually this results from ?!?!?!?!.		
+		with the restriction that $n \geq 2k$ to ensure compatible the state and matrix are compatible for multiplication. Then the einsum computing $U\vec{\psi}$ is indexed as\footnote{Three worked examples:
+			\begin{enumerate}
+				\item single-qubit matrix $M$ acting on two-qubit state $\psi$ ($k=1$,$n=2$): $(M\psi)_{jk} = M_{ij} \psi_{ik}$ has one summation index \textbf{i} and two free indices \textbf{j,k}, for $\mathbb{O}(2^{3})$
+				\item two-qubit matrix $M$ acting on two-qubit state $\psi$ ($k=2$,$n=2$): $(M\psi)_{\ell m} = M_{jk\ell m} \psi_{jk}$ has two summation indices \textbf{j,k} and two free indices \textbf{$\ell$,m}, for $\mathbb{O}(2^{4})$
+				\item two-qubit matrix $M$ acting on three-qubit state $\psi$ ($k=2$,$n=3$): $(M\psi)_{\ell m n} = M_{jk\ell m} \psi_{jk n}$ has two summation indices \textbf{j,k} and three free indices \textbf{$\ell$,m,n}, for $\mathbb{O}(2^{5})$
+			\end{enumerate}		}
+		$$i_1 \cdots i_{k}, i_1' \cdots i_{k}' i_1 \cdots i_n \rightarrow  i_{k + 1} \cdots i_n i_1' \cdots i_k ' $$ has $k$ summation indices and $(n-2k)$ free indices, resulting in a complexity of $\mathbb{O}(2^{n + k})$ since every tensor axis is dimension two. 
 \end{enumerate}
 
-The complexity of method (3) is obviously a lower bound since \textit{computing} all of the elements in $\vec{\psi}' = U \vec{\psi}$ elements can require no less than $2^n$ computations. However this is cannot be the minimum complexity of processing (FIXME: computing vs processing vs solving..?!?!?!?!) $U \vec{\psi}$, since the simple counterexample of $I \vec{\psi}$ requires exactly 0 computations. This motivates even more streamlined unitary action, which will be introduced in the following sections.
+The complexity of method (3) does not saturate the lower bound for computing all of the elements in $\vec{\psi}' = U \vec{\psi}$ elements, which can require as few as $2^{n}$ operations (namely, $I \vec{\psi}$ using sparse multiplication saturates this bound). This motivates even more streamlined unitary action, which will be introduced in the following sections.
 
-\subsection{Clifford circuits}
+\subsection{Nonlinear mappings}
 
 \subsubsection{Example: $X_k$}
 \label{sec:clifford_example}
 This section begins with an example of applying a permutation to a tensor subspace (taken from the \texttt{apply\_unitary} from the \textsc{cirq} library). Let $X_k$ be the Pauli-X gate acting on the qubit indexed ``k''. Define the operation $\texttt{slice\_for\_bitstring}(T, \{i\text{ for i=1...k}\}, \vec{s})$ to access elements of tensor $T$ for which the subspace corresponding to qubits $\{0, 1, \cdots, k\}$ is represented by the (little-endian) bitstring $\vec{s}$ (and so $|\vec{s}| = |\{i_k\}|$). TODO: example of this....
 
-This slices for a subset of $2^{n-k}$ elements, but for an array stored with a known memory layout and stride the slice can be accessed in $\mathbb{O}(k)$ time (DEMONSTRATED EMPIRICALLY, PROVE THIS?). Then the action of $X_k$ on $\vec{\psi}$ can be computed in two steps using a memory buffer $T'$ sized the same as $T$:
+This slices for a subset of $2^{n-k}$ elements. Then the action of $X_k$ on $\vec{\psi}$ can be computed in two steps using a memory buffer $T'$ sized the same as $T$ (namely, $2^n$):
 \begin{itemize}
 	\item Compute $S_0 = \texttt{slice\_for\_bitstring}(T, \{k\}, (0))$ and \\$S_1= \texttt{slice\_for\_bitstring}(T, \{k\}, (0))$ which slice $T$ for all elements in which the k-th qubit is a ``0'' or ``1'' respectively
-	\item Set $T'[S_1] = T[S_0]$ and $T'[S_0] = T[S_1]$. In plain English, this sets the amplitude for each basis state in $T'$ to be the same as the amplitude in $T$ where the k-th qubit of that basis state is flipped. 
+	\item Set $T'[S_1] = T[S_0]$ and $T'[S_0] = T[S_1]$ at a cost of $\mathbb{O}(2^{n-1})$ each, for a total complexity requirement of $\mathbb{O}(2^n)$. In plain English, this sets the amplitude for each basis state in $T'$ to be the same as the amplitude in $T$ where the k-th qubit of that basis state is flipped. 
 \end{itemize}
 
-\subsubsection{General Clifford operations}
-Section \ref{sec:clifford_example} demonstrated how a single-qubit gate acting on an n-qubit state can be implemented in $\mathbb{O}(n)$, which is exponential improvement over the best matrix-style operations (at the expense of exponential memory overhead in the number of qubits, i.e. the buffer state).
+
+Section \ref{sec:clifford_example} demonstrated how a certain single-qubit gate acting on an n-qubit state can be implemented in $\mathbb{O}(2^n)$, which is at least $2\times$ improvement over the best matrix-style operations (at the expense of exponential memory overhead in the number of qubits, i.e. the uninitialized buffer state).
 
 
 TODO
-
+\subsubsection{General Clifford operations}
 - Clifford circuits are easy to simulate (Gottesman). Computationally these are relatively sparse matrices.
 
 Here we review an algorithmic app

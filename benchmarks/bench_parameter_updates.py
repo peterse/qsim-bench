@@ -13,7 +13,7 @@ np.random.seed(31415926)
 @pytest.fixture(scope="module")
 def meta():
     """Shared circuit and parameter data across tests."""
-    depth = 5
+    depth = 2
     qubits = cirq.LineQubit.range(5)
     n_loops = 100
     return {"depth": depth,
@@ -100,12 +100,14 @@ def test_single_qubit_parametrized_n_loops(benchmark, meta, helper):
     """
     inst = helper(meta)
     c = _generator_type_zero(meta["depth"], meta["qubits"], meta["params"][0])
+    print(c)
     params = inst.prepare_parameters(meta["params"][0])
     cprime = helper.prepare(c)
 
     def n_loops(meta, inst, cprime, params):
         """Global scope outer-loop."""
         for k, params in zip(range(meta["n_loops"]), meta["params"]):
+            print("iter", k)
             # skip validation, come back to it later
             # results[k] = inst.updated_execute(cprime, params)
             inst.updated_execute(cprime, params)

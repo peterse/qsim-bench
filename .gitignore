@@ -1,4 +1,6 @@
-
+# Python meta
+*.pyc
+__pycache__
 
 # LaTeX meta
 *.aux
