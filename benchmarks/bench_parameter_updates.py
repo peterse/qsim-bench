@@ -1,3 +1,4 @@
+"""Benchmark parametrization and parameter updates."""
 import pytest
 import sympy
 import numpy as np
@@ -5,7 +6,8 @@ import cirq
 
 import sys
 sys.path.insert(0, ".")
-from helpers import _CirqTPU, _TFCirq, _TFQEigen, _Cirq
+from helpers import SimCirqTPU, SimTFCirq, SimTFQEigen, SimCirq
+
 np.random.seed(31415926)
 
 
@@ -87,7 +89,7 @@ def _generator_type_zero(depth, qubits, params):
     return cirq.Circuit.from_ops(out)
 
 
-@pytest.mark.parametrize('helper', [_TFCirq, _Cirq])
+@pytest.mark.parametrize('helper', [SimTFCirq, SimCirq])
 def test_single_qubit_parametrized_n_loops(benchmark, meta, helper):
     """
     Benchmark description:

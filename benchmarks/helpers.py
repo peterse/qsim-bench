@@ -17,7 +17,7 @@ class Helper:
         """
 
 
-class _CirqTPU(Helper):
+class SimCirqTPU(Helper):
     @staticmethod
     def prepare(c):
         """Preprocess circuit c before timing starts."""
@@ -39,7 +39,7 @@ class _CirqTPU(Helper):
         return output
 
 
-class _TFCirq(Helper):
+class SimTFCirq(Helper):
 
     # def __init__(self, meta=None):
     #     self.labels = "placeholder{}:0".format(i) for i in range(meta["params"])
@@ -84,7 +84,7 @@ class _TFCirq(Helper):
         return output
 
 
-class _TFQEigen(Helper):
+class SimTFQEigen(Helper):
     @staticmethod
     def prepare(c):
         """Preprocess circuit c before timing starts."""
@@ -98,8 +98,7 @@ class _TFQEigen(Helper):
         return
 
 
-
-class _Cirq(Helper):
+class SimCirq(Helper):
 
     @staticmethod
     def prepare(c):
@@ -128,7 +127,8 @@ class _Cirq(Helper):
         expects a feed dict of the form {symbol: new_value}.
 
         WARNING:This abbreviated method is UNSAFE: and will ignore symbol
-        resolutions for a 10x speedup.
+        resolutions for a 10x speedup. This is a temporary measure until
+        the slowdown is resolved - xref Cirq #1899
 
         Timing disclosure:
           1. Iteratively copy the existing circuit op-wise, inserting new

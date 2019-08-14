@@ -1,12 +1,14 @@
-"""Benchmark simulators against Cirq's wavefunction sim."""
+"""Benchmark on progressively more difficult unitary structures."""
 
 import pytest
 import numpy as np
+
 import cirq
+import sys
+sys.path.insert(0, ".")
+from helpers import SimCirqTPU, SimTFCirq, SimTFQEigen, SimCirq
 
-from helpers import _CirqTPU, _TFCirq, _TFQEigen, _Cirq
 np.random.seed(31415926)
-
 
 # pairs like (number of qubits, depth)
 TRIAL_RUNS = [
@@ -58,7 +60,7 @@ def _clifford_circuit_generator(n_qubits, depth):
     return cirq.Circuit.from_ops(ops)
 
 
-@pytest.mark.parametrize('helper', [_CirqTPU, _TFCirq, _TFQEigen, _Cirq])
+@pytest.mark.parametrize('helper', [SimCirqTPU, SimTFCirq, SimTFQEigen, SimCirq])
 @pytest.mark.parametrize('n_qubits,depth', TRIAL_RUNS)
 def test_clifford_circuit_simulation(benchmark, helper, n_qubits, depth):
     """
@@ -124,7 +126,7 @@ def _generator_no_cliffords_1(n_qubits, depth):
     return cirq.Circuit.from_ops(ops)
 
 
-@pytest.mark.parametrize('helper', [_CirqTPU, _TFCirq, _TFQEigen, _Cirq])
+@pytest.mark.parametrize('helper', [SimCirqTPU, SimTFCirq, SimTFQEigen, SimCirq])
 @pytest.mark.parametrize('n_qubits,depth', TRIAL_RUNS)
 def test_no_clifford_type_1_simulation(benchmark, helper, n_qubits, depth):
     """
@@ -185,7 +187,7 @@ def _generator_no_cliffords_2(n_qubits, depth):
     return cirq.Circuit.from_ops(ops)
 
 
-@pytest.mark.parametrize('helper', [_CirqTPU, _TFCirq, _TFQEigen, _Cirq])
+@pytest.mark.parametrize('helper', [SimCirqTPU, SimTFCirq, SimTFQEigen, SimCirq])
 @pytest.mark.parametrize('n_qubits,depth', TRIAL_RUNS)
 def test_no_clifford_type_2_simulation(benchmark, helper, n_qubits, depth):
     """
