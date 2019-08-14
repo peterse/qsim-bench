@@ -17,9 +17,8 @@ TRIAL_RUNS = [
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# TYPE-ZERO TESTS: ALL CIRCUIT OPERATIONS HAVE A SPECIALIZED UNITARY OPERATION
-# THAT ALLOWS EFFICIENT UNITARY ACTION DURING CIRCUIT SIMULATION
-
+# CLIFFORD CIRCUIT TESTS: ALL CIRCUIT OPERATIONS HAVE A SPECIALIZED UNITARY
+# OPERATION THAT ALLOWS EFFICIENT UNITARY ACTION DURING CIRCUIT SIMULATION
 OPS_LIST_0 = [
     cirq.X,
     cirq.Y,
@@ -29,10 +28,9 @@ OPS_LIST_0 = [
     cirq.CZ,
     cirq.CNOT,
     cirq.SWAP,
-    cirq.ISWAP,
 ]
 
-def _generator_type_zero(n_qubits, depth):
+def _clifford_circuit_generator(n_qubits, depth):
     """Construct a (possibly dense) circuit from OPS_LIST_0."""
     qubits = cirq.LineQubit.range(n_qubits)
     ops = []
@@ -62,7 +60,7 @@ def _generator_type_zero(n_qubits, depth):
 
 @pytest.mark.parametrize('helper', [_CirqTPU, _TFCirq, _TFQEigen, _Cirq])
 @pytest.mark.parametrize('n_qubits,depth', TRIAL_RUNS)
-def test_specialized_unitary_fallback(benchmark, helper, n_qubits, depth):
+def test_clifford_circuit_simulation(benchmark, helper, n_qubits, depth):
     """
     Perform a circuit simulation that uses purely `specialized` operations
     for computing the output state. This is the first type of operation that
@@ -77,11 +75,10 @@ def test_specialized_unitary_fallback(benchmark, helper, n_qubits, depth):
         cirq.CZ (cirq.CZPowGate(1))
         cirq.CNOT
         cirq.SWAP
-        cirq.ISWAP
     (For this gateset minus H, it is obvious that matrix permutation is more
     efficient than einsum)
     """
-    target = _generator_type_zero(n_qubits, depth)
+    target = _clifford_circuit_generator(n_qubits, depth)
     setup = helper.prepare(target)
     result = benchmark(helper.execute(setup))
 
@@ -99,7 +96,7 @@ OPS_LIST_1 = [
 ]
 
 
-def _generator_type_one(n_qubits, depth):
+def _generator_no_cliffords_1(n_qubits, depth):
     """Construct a (possibly dense) circuit from OPS_LIST_1."""
     qubits = cirq.LineQubit.range(n_qubits)
     ops = []
@@ -129,7 +126,7 @@ def _generator_type_one(n_qubits, depth):
 
 @pytest.mark.parametrize('helper', [_CirqTPU, _TFCirq, _TFQEigen, _Cirq])
 @pytest.mark.parametrize('n_qubits,depth', TRIAL_RUNS)
-def test_cirq_single_qubit_fallback(benchmark, helper, n_qubits, depth):
+def test_no_clifford_type_1_simulation(benchmark, helper, n_qubits, depth):
     """
     Perform a circuit simulation that uses purely single-qubit gates with
     efficient multiplication via cirq.linalg.apply_matrix_to_slices but do not
@@ -141,7 +138,7 @@ def test_cirq_single_qubit_fallback(benchmark, helper, n_qubits, depth):
         cirq.H ** (!1)
 
     """
-    target = _generator_type_one(n_qubits, depth)
+    target = _generator_no_cliffords_1(n_qubits, depth)
     setup = helper.prepare(target)
     result = benchmark(helper.execute(setup))
 
@@ -158,8 +155,8 @@ OPS_LIST_2 = [
 ]
 
 
-def _generator_type_two(n_qubits, depth):
-    """Construct a (possibly dense) circuit from OPS_LIST_1."""
+def _generator_no_cliffords_2(n_qubits, depth):
+    """Construct a (possibly dense) circuit from OPS_LIST_2."""
     qubits = cirq.LineQubit.range(n_qubits)
     ops = []
     for layer in range(depth):
@@ -190,7 +187,7 @@ def _generator_type_two(n_qubits, depth):
 
 @pytest.mark.parametrize('helper', [_CirqTPU, _TFCirq, _TFQEigen, _Cirq])
 @pytest.mark.parametrize('n_qubits,depth', TRIAL_RUNS)
-def test_cirq_einsum_fallback(benchmark, helper, n_qubits, depth):
+def test_no_clifford_type_2_simulation(benchmark, helper, n_qubits, depth):
     """
     Perform a circuit siulation that uses purely two-qubit gates subject to
     cirq.linalg.targeted_left_multiply (wrapper for np.einsum) but do NOT
@@ -201,6 +198,6 @@ def test_cirq_einsum_fallback(benchmark, helper, n_qubits, depth):
         cirq.SWAP ** (!1)
         cirq.ISWAP ** (!1)
     """
-    target = _generator_type_two(n_qubits, depth)
+    target = _generator_no_cliffords_2(n_qubits, depth)
     setup = helper.prepare(target)
     result = benchmark(helper.execute(setup))
