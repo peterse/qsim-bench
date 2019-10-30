@@ -75,7 +75,7 @@
 \section{Methods}
 \section{Simulator methods}
 
-\subsection{General unitary matrix multiplication}
+\subsection{General unitary multiplication}
 \label{sec:fallback3}
 A complete wavefunction simulator (cite Biamonte for what that means; I'll be reffing tensor networks anyways) generally applies the action of a gate as an einsum to the qubit axes acted on by the gate.
 
@@ -89,64 +89,89 @@ For example, let $U_1$ be a unitary over a subset of $k_1$ and $U_2$ be qubits o
 \end{align}
 
 
-The following list details approaches to computing $U_2 U_1 \ket{\psi}$ in order of worst to best:
+The following list details approaches to computing $U_2 U_1 \ket{\psi}$ \underline{in order of worst to best:}
 \begin{enumerate}
 	\item \textbf{kronecker product + matmul}: This requires resizing the matrices to $n$ dimensions then performing matrix multiplication
 	\begin{enumerate}
-		\item kronecker product $U_1 \rightarrow U_1' \in \mathbb{C^{2^n \times 2^n}}$ using $I_2$ ($\mathbb{O}(2^k_1 2^k_1 2^{n-k_1} 2^{n-k_1}) = \mathbb{O}(2^{2n})$)
-		\item kronecker product $U_2 \rightarrow U_2' \in \mathbb{C^{2^n \times 2^n}}$ using $I_2$ ($\mathbb{O}(2^k_2 2^k_2 2^{n-k_2} 2^{n-k_2}) = \mathbb{O}(2^{2n})$)
-		\item matmul $U_2' U_1' \rightarrow U_f \in \mathbb{C^{2^n \times 2^n}}$ ($\mathbb{O}(2^{3n})$)\footnote{Assuming ``schoolbook'' matrix multiplication algorithm. For square matrix multiplication this can be improved to $\mathbb{O}(2^{2.807n})$ or even $\mathbb{O}(2^{2.37n})$ with ML but that's not the point of this worst-case example}
-		\item matmul $ U_f \vec{\psi}$ ($\mathbb{O}(2^{2n})$)
+		\item kronecker product $U_1 \rightarrow U_1' \in \mathbb{C^{2^n \times 2^n}}$ using $I_2$ ($\mathcal{O}(2^k_1 2^k_1 2^{n-k_1} 2^{n-k_1}) = \mathcal{O}(2^{2n})$)
+		\item kronecker product $U_2 \rightarrow U_2' \in \mathbb{C^{2^n \times 2^n}}$ using $I_2$ ($\mathcal{O}(2^k_2 2^k_2 2^{n-k_2} 2^{n-k_2}) = \mathcal{O}(2^{2n})$)
+		\item matmul $U_2' U_1' \rightarrow U_f \in \mathbb{C^{2^n \times 2^n}}$ ($\mathcal{O}(2^{3n})$)\footnote{Assuming ``schoolbook'' matrix multiplication algorithm. For square matrix multiplication this can be improved to $\mathcal{O}(2^{2.807n})$ or even $\mathcal{O}(2^{2.37n})$ with ML but that's not the point of this worst-case example}
+		\item matmul $ U_f \vec{\psi}$ ($\mathcal{O}(2^{2n})$)
 	\end{enumerate}
-	\item \textbf{kronecker product + matmul, associativity}: This swaps (c) and (d), taking advantage of the fact that $U \vec{\psi}$ has complexity $\mathbb{O}(2^{2n})$ for $U \in \mathbb{C}^{2^n \times 2^n}$, meaning both products cost $\mathbb{O}(2^{2n + 1})$ instead of $\mathbb{O}(2^{3n} + 2^{2n})$. Conceptually this results from not having to calculate the full intermediate $U_f$.
+	\item \textbf{kronecker product + matmul, associativity}: This swaps (c) and (d), taking advantage of the fact that $U \vec{\psi}$ has complexity $\mathcal{O}(2^{2n})$ for $U \in \mathbb{C}^{2^n \times 2^n}$, meaning both products cost $\mathcal{O}(2^{2n + 1})$ instead of $\mathcal{O}(2^{3n} + 2^{2n})$. Conceptually this results from not having to calculate the intermediate $U_f$.
 	\item \textbf{einsum}: An einstein summation allows general tensor transformations using repeated (summation) and permuted (free) indices (See Appendix~\ref{sec:a1} for some common examples). The austere implementation results in a complexity of\cite{https://obilaniu6266h16.wordpress.com/2016/02/04/einstein-summation-in-numpy/}: 
-		\begin{equation}
-			\mathbb{O}\left( \left(\prod_i^{N_\text{free}} d_i\right) \left(\prod_i^{N_\text{sum}} d_i\right) \right)
-		\end{equation}
-		where $N_\text{free}$ is the number of free indices (indices of output), $N_\text{sum}$ is the number of unique input indices between input tensors, and $d_i$ is the size of the axis corresponding to the i-th index. \footnote{For example, the einsum string \textbf{ik,kj-$>$ij} multiplies two matrices using free indices \textbf{i}, \textbf{j} and summation index \textbf{k}; if \textbf{i}, \textbf{j}, \textbf{k} index axes of sizes $\ell,m,n$ respectively, the complexity of this einsum is 	$\mathbb{O}( (d_i d_j) (d_k) ) = \mathbb{O}( \ell mn)$, the expected complexity of matrix multiplication.}
-		
-		Let unitaries and wavefunctions be represented as tensors of the shape:
-		\begin{align}
-			U &\in \mathbb{C}^{\overbrace{ \scriptstyle 2 \times 2 \times \cdots}^{\text{k times}}} \\
-			\vec{\psi} &\in \mathbb{C}^{\overbrace{ \scriptstyle 2 \times \cdots}^\text{n times}}
-		\end{align}
-		with the restriction that $n \geq 2k$ to ensure compatible the state and matrix are compatible for multiplication. Then the einsum computing $U\vec{\psi}$ is indexed as\footnote{Three worked examples:
-			\begin{enumerate}
-				\item single-qubit matrix $M$ acting on two-qubit state $\psi$ ($k=1$,$n=2$): $(M\psi)_{jk} = M_{ij} \psi_{ik}$ has one summation index \textbf{i} and two free indices \textbf{j,k}, for $\mathbb{O}(2^{3})$
-				\item two-qubit matrix $M$ acting on two-qubit state $\psi$ ($k=2$,$n=2$): $(M\psi)_{\ell m} = M_{jk\ell m} \psi_{jk}$ has two summation indices \textbf{j,k} and two free indices \textbf{$\ell$,m}, for $\mathbb{O}(2^{4})$
-				\item two-qubit matrix $M$ acting on three-qubit state $\psi$ ($k=2$,$n=3$): $(M\psi)_{\ell m n} = M_{jk\ell m} \psi_{jk n}$ has two summation indices \textbf{j,k} and three free indices \textbf{$\ell$,m,n}, for $\mathbb{O}(2^{5})$
-			\end{enumerate}		}
-		$$i_1 \cdots i_{k}, i_1' \cdots i_{k}' i_1 \cdots i_n \rightarrow  i_{k + 1} \cdots i_n i_1' \cdots i_k ' $$ has $k$ summation indices and $(n-2k)$ free indices, resulting in a complexity of $\mathbb{O}(2^{n + k})$ since every tensor axis is dimension two. 
+	\begin{equation}
+		\mathcal{O}\left( \left(\prod_i^{N_\text{free}} d_i\right) \left(\prod_i^{N_\text{sum}} d_i\right) \right)
+	\end{equation}
+	where $N_\text{free}$ is the number of free indices (indices of output), $N_\text{sum}$ is the number of unique input indices between input tensors, and $d_i$ is the size of the axis corresponding to the i-th index. \footnote{For example, the einsum string \textbf{ik,kj-$>$ij} multiplies two matrices using free indices \textbf{i}, \textbf{j} and summation index \textbf{k}; if \textbf{i}, \textbf{j}, \textbf{k} index axes of sizes $\ell,m,n$ respectively, the complexity of this einsum is 	$\mathcal{O}( (d_i d_j) (d_k) ) = \mathcal{O}( \ell mn)$, the expected complexity of matrix multiplication.}
+	
+	Let unitaries and wavefunctions be represented in tensored Hilbert space:
+	\begin{align}\label{eq:tensorU}
+		U &\in \overbrace{ \mathbb{C}^2 \otimes \mathbb{C}^2 \cdots  \otimes \mathbb{C}^2}^{\text{k times}} \\
+		\label{eq:tensorpsi}
+		\vec{\psi} &\in \overbrace{ \mathbb{C}^2 \otimes \mathbb{C}^2 \cdots  \otimes \mathbb{C}^2}^{\text{n times}}
+	\end{align}
+	with the restriction that $n \geq 2k$ to ensure that the state and matrix are compatible for multiplication. Here I enforce that these objects retain as many axes as there are elements in the tensored space, so that they have a general tensor representation instead of being treated as matrices and vectors. Then the einsum computing $U\vec{\psi}$ is indexed as\footnote{Three worked examples:
+		\begin{enumerate}
+			\item single-qubit matrix $M$ acting on two-qubit state $\psi$ ($k=1$,$n=2$): $(M\psi)_{jk} = M_{ij} \psi_{ik}$ has one summation index \textbf{i} and two free indices \textbf{j,k}, for $\mathcal{O}(2^{3})$
+			\item two-qubit matrix $M$ acting on two-qubit state $\psi$ ($k=2$,$n=2$): $(M\psi)_{\ell m} = M_{jk\ell m} \psi_{jk}$ has two summation indices \textbf{j,k} and two free indices \textbf{$\ell$,m}, for $\mathcal{O}(2^{4})$
+			\item two-qubit matrix $M$ acting on three-qubit state $\psi$ ($k=2$,$n=3$): $(M\psi)_{\ell m n} = M_{jk\ell m} \psi_{jk n}$ has two summation indices \textbf{j,k} and three free indices \textbf{$\ell$,m,n}, for $\mathcal{O}(2^{5})$
+		\end{enumerate}		}
+	$$i_1 \cdots i_{k}, i_1' \cdots i_{k}' i_1 \cdots i_n \rightarrow  i_{k + 1} \cdots i_n i_1' \cdots i_k ' $$ has $k$ summation indices and $(n-2k)$ free indices, resulting in a complexity of $\mathcal{O}(2^{n + k})$ since every tensor axis is dimension two. 
 \end{enumerate}
 
 The complexity of method (3) does not saturate the lower bound for computing all of the elements in $\vec{\psi}' = U \vec{\psi}$ elements, which can require as few as $2^{n}$ operations (namely, $I \vec{\psi}$ using sparse multiplication saturates this bound). This motivates even more streamlined unitary action, which will be introduced in the following sections.
 
-\subsection{Nonlinear mappings}
+\subsection{Nonlinear mappings}\label{sec:nonlinear}
 
-\subsubsection{Example: $X_k$}
+\subsubsection{Tensor index notation}
+
+An wavefunction over $n$ qubits defined in the tensored Hilbert space of Equation~\ref{eq:tensorpsi} is completely defined by $k$ binary indices:
+$$
+\psi = \psi_{i_1 i_2 \cdots i_n}
+$$
+
+\begin{enumerate}
+	\item Explain $(2,)^k$-shaped Tensors as nested $2\times 2$ matrices for visualization/index intuition
+	\item \textcolor{red}{someone else can explain tensor notation better than me.}
+\end{enumerate}
+
+
+\subsubsection{Example: $X_k$}\label{sec:Xj}
 \label{sec:clifford_example}
-This section begins with an example of applying a permutation to a tensor subspace (taken from the \texttt{apply\_unitary} from the \textsc{cirq} library). Let $X_k$ be the Pauli-X gate acting on the qubit indexed ``k''. Define the operation $\texttt{slice\_for\_bitstring}(T, \{i\text{ for i=1...k}\}, \vec{s})$ to access elements of tensor $T$ for which the subspace corresponding to qubits $\{0, 1, \cdots, k\}$ is represented by the (little-endian) bitstring $\vec{s}$ (and so $|\vec{s}| = |\{i_k\}|$). TODO: example of this....
+This section begins with an example of applying a permutation to a tensor subspace . Let $X^{(j)}$ be the Pauli-X gate acting on the qubit indexed ``j''. Let $\psi_{\cdots i_{j-1} 0 i_{j+1} \cdots}$ be the subspace of $\psi$ for which qubit $j$ is in the ``0'' state. The action of $X^{(j)}$ is to swap the amplitudes of $\ket{0}_j$ and $\ket{1}_j$, which is reproduced by the following series of assignments:
+\begin{enumerate}
+	\item Initialize $\phi := \psi_{\cdots i_{j-1} ,0 ,i_{j+1} \cdots}$ ($\mathcal{O}(2^{n-1})$ ops)
+	\item $\psi_{\cdots i_{j-1} ,0, i_{j+1} \cdots} \rightarrow \psi_{\cdots i_{j-1} ,1 ,i_{j+1} \cdots}$ ($\mathcal{O}(2^{n-1})$ ops)
+	\item $\psi_{\cdots i_{j-1} ,1, i_{j+1} \cdots} \rightarrow \phi$ ($\mathcal{O}(2^{n-1})$ ops)
+\end{enumerate}
+Where the first step is required so that necessary information in $\psi$ is not overwritten by assignments (2) and (3). The total complexity of this process is $\mathcal{O}(2^{n+1})$.
 
-This slices for a subset of $2^{n-k}$ elements. Then the action of $X_k$ on $\vec{\psi}$ can be computed in two steps using a memory buffer $T'$ sized the same as $T$ (namely, $2^n$):
-\begin{itemize}
-	\item Compute $S_0 = \texttt{slice\_for\_bitstring}(T, \{k\}, (0))$ and \\$S_1= \texttt{slice\_for\_bitstring}(T, \{k\}, (0))$ which slice $T$ for all elements in which the k-th qubit is a ``0'' or ``1'' respectively
-	\item Set $T'[S_1] = T[S_0]$ and $T'[S_0] = T[S_1]$ at a cost of $\mathbb{O}(2^{n-1})$ each, for a total complexity requirement of $\mathbb{O}(2^n)$. In plain English, this sets the amplitude for each basis state in $T'$ to be the same as the amplitude in $T$ where the k-th qubit of that basis state is flipped. 
-\end{itemize}
+\textcolor{red}{FIXME/TODO: I haven't been tracking read/write complexity for the other multiplication methods, which means this isn't the 2x speed up it ought to be compared to einsum.}
 
 
-Section \ref{sec:clifford_example} demonstrated how a certain single-qubit gate acting on an n-qubit state can be implemented in $\mathbb{O}(2^n)$, which is at least $2\times$ improvement over the best matrix-style operations (at the expense of exponential memory overhead in the number of qubits, i.e. the uninitialized buffer state).
+
+\subsubsection{General nonlinear assignments as tensor operations}
+	
+This procedures of Section~\ref{sec:Xj} can be generalized to apply permutation (FIXME: there is a special case for Hadamard, so I need a more general name for this set of matrices...) unitaries over $k$ qubits to a state defined over $n$ qubits. A bitstring $\vec{s}\in\{0,1\}^k$ can be used to select for the subspace of $\psi$ in which $k$ qubits are fixed to the state $\ket{\vec{s}}$ (here, the set of qubits is assumed to be contiguous for ease of notation, but this is not necessary in general). Then a the action of a permutation matrix with elements $\ket{\vec{s}_i} \bra{\vec{s}_j}$ is accomplished by a series of tensor assignments of the form $\psi_{\vec{s}_j} \rightarrow \psi_{\vec{s}_i}$.
+
+
+Section \ref{sec:clifford_example} demonstrated how a certain single-qubit gate acting on an n-qubit state can be implemented in $\mathcal{O}(2^n)$, which is at least $2\times$ improvement over the best matrix-style operations (at the expense of exponential memory overhead in the number of qubits, i.e. the uninitialized buffer state).
 
 
 TODO
+\begin{itemize}
+	\item permutation matrices (plus phase)
+	\item sparse matrices (Hadamard)
+	\item why \textit{doesn't} this work for T-gate
+\end{itemize}
 \subsubsection{General Clifford operations}
 - Clifford circuits are easy to simulate (Gottesman). Computationally these are relatively sparse matrices.
 
-Here we review an algorithmic app
+Here we introduce a formal equivalence between the methods of Section~\ref{sec:nonlinear} with the efficient simulation methods for clifford circuits acting on stabilizer states.
 
 \section{Benchmark methods}
 This repo uses the \textsc{pytest-benchmark} fixture to profile python code.
-
-\section{Results}
 
 
 \begin{appendices}
